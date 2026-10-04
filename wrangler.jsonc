@@ -21,8 +21,6 @@
 		{ "pattern": "xinchejian.com", "custom_domain": true },
 		// Bound only so it can 301 to the apex; see src/host-redirect.ts.
 		{ "pattern": "www.xinchejian.com", "custom_domain": true },
-		// Staging. Kept out of the index by src/middleware.ts.
-		{ "pattern": "beta.xinchejian.com", "custom_domain": true },
 	],
 	// Keep the workers.dev address to tell DNS problems from app problems.
 	"workers_dev": true,
@@ -30,9 +28,6 @@
 	// loopback hosts can run setup without it, so production needs it set.
 	"vars": {
 		"EMDASH_SITE_URL": "https://xinchejian.com",
-		// beta is a subdomain of the rpId's domain, so a passkey registered for
-		// the apex also works there — this is what keeps staging signable.
-		"EMDASH_ALLOWED_ORIGINS": "https://beta.xinchejian.com",
 	},
 	// Cloudflare Email Sending, for magic-link sign-in and account recovery.
 	// The sender domain (xinchejian.com) has to be onboarded under Compute >
@@ -47,5 +42,38 @@
 	// General maintenance cron trigger
 	"triggers": {
 		"crons": ["* * * * *"],
+	},
+	// Staging, on beta.xinchejian.com. Its own Worker, D1 database and R2 bucket,
+	// so a preview build and its first-request migrations cannot touch production
+	// content. Named environments inherit no bindings: everything the beta Worker
+	// needs is repeated here. Select it with CLOUDFLARE_ENV=beta at build and
+	// deploy time, not --env; see README.
+	"env": {
+		"beta": {
+			"name": "xinchejian-beta",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "xinchejian-beta",
+				},
+			],
+			"r2_buckets": [
+				{
+					"binding": "MEDIA",
+					"bucket_name": "xinchejian-media-beta",
+				},
+			],
+			"routes": [{ "pattern": "beta.xinchejian.com", "custom_domain": true }],
+			// beta is its own origin now, so it is the site URL here. Production
+			// stopped accepting it once this environment took over the hostname.
+			"vars": {
+				"EMDASH_SITE_URL": "https://beta.xinchejian.com",
+			},
+			"send_email": [{ "name": "EMAIL" }],
+			"limits": { "cpu_ms": 30000 },
+			"triggers": {
+				"crons": ["* * * * *"],
+			},
+		},
 	},
 }

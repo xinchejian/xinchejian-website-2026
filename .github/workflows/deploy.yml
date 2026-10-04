@@ -1,38 +1,70 @@
 name: Deploy
 
-# Publishing a GitHub release deploys that tag to Cloudflare. `wrangler
-# deploy` ships the Worker, its D1/R2 bindings, the Cron Trigger, and the
-# custom domains in one pass, so the built artifact and the routing config
-# always move together.
+# Publishing a release deploys that tag. beta goes out automatically,
+# production waits for approval on the `production` GitHub environment.
 on:
   release:
     types: [published]
   # Manual runs use whatever ref is selected in the UI.
   workflow_dispatch:
 
-# Never let two releases race for the same Worker. Queue instead of
-# cancelling: an interrupted deploy can leave routes half-applied.
+# Never let two deploys race for the same Worker. Queue instead of cancelling:
+# an interrupted deploy can leave routes half-applied.
 concurrency:
   group: deploy-xinchejian
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
-  deploy:
+  beta:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    # The Cloudflare adapter flattens the selected Wrangler environment into
+    # dist/server/wrangler.json during the build, so the environment has to be
+    # chosen here; `wrangler deploy --env` has nothing left to resolve against.
     env:
-      # The account that owns the xinchejian.com zone, not the personal one.
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ENV: beta
     steps:
       - uses: actions/checkout@v4
-      # Version comes from packageManager in package.json.
+      # pnpm version comes from packageManager in package.json.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Runs predeploy (wrangler types), astro build, then wrangler deploy.
-      - run: pnpm run deploy
+      - run: pnpm build
+      # A build that ignored CLOUDFLARE_ENV would have flattened the top-level
+      # config, and deploying that would hit production. Refuse instead.
+      - name: Check the build targeted beta
+        run: |
+          node -e "const c=JSON.parse(require('node:fs').readFileSync('dist/server/wrangler.json','utf8'));if(c.name!=='xinchejian-beta'){console.error('Refusing to deploy: build targeted '+c.name);process.exit(1)}console.log('Deploying '+c.name)"
+      - run: pnpm exec wrangler deploy
+
+  production:
+    needs: beta
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment hold the deploy until beta has been
+    # checked at https://beta.xinchejian.com. Configure them under
+    # Settings -> Environments -> production; without them this job runs straight
+    # through, as it did before the environments were split.
+    environment: production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Check the build targeted production
+        run: |
+          node -e "const c=JSON.parse(require('node:fs').readFileSync('dist/server/wrangler.json','utf8'));if(c.name!=='xinchejian'){console.error('Refusing to deploy: build targeted '+c.name);process.exit(1)}console.log('Deploying '+c.name)"
+      - run: pnpm exec wrangler deploy

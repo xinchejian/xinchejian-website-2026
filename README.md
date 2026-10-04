@@ -32,18 +32,52 @@ pnpm dev
 
 ## Deploy
 
-The Worker is configured in `wrangler.jsonc` with `beta.xinchejian.com` as a custom domain; the cutover below adds `xinchejian.com` and `www.xinchejian.com` (which redirects to the apex). Every domain must be in the same Cloudflare account as the `xinchejian.com` zone. The Worker bundle is about 3.9 MB gzipped, so the account needs the **Workers Paid** plan: the free plan's limit is 3 MB.
+Two Workers, both in the Cloudflare account that owns the `xinchejian.com` zone:
+
+|             | Worker            | Hostname                       | D1               | R2                       |
+| ----------- | ----------------- | ------------------------------ | ---------------- | ------------------------ |
+| Production  | `xinchejian`      | `xinchejian.com` (and `www`)   | `xinchejian`     | `xinchejian-media`       |
+| Staging     | `xinchejian-beta` | `beta.xinchejian.com`          | `xinchejian-beta`| `xinchejian-media-beta`  |
+
+Each has its own database and bucket, so a staging build — and the core migrations its first request applies — cannot touch production content. `www.xinchejian.com` is bound only so it can 301 to the apex. The Worker bundle is about 3.9 MB gzipped, so the account needs the **Workers Paid** plan: the free plan's limit is 3 MB.
+
+Both live in `wrangler.jsonc` as the top level and the `beta` entry under `env`. **Named Wrangler environments inherit no bindings**, and the Cloudflare adapter flattens the selected environment into `dist/server/wrangler.json` during the build. So the environment is chosen with `CLOUDFLARE_ENV` *before the build*, not with `wrangler deploy --env`, which has nothing left to resolve against:
 
 ```sh
-pnpm wrangler login   # the account that owns the xinchejian.com zone
-pnpm run deploy       # astro build && wrangler deploy
+pnpm wrangler login                    # the account that owns the xinchejian.com zone
+CLOUDFLARE_ENV=beta pnpm run deploy    # beta.xinchejian.com
+pnpm run deploy                        # xinchejian.com
 ```
 
-The first deploy created the D1 database `xinchejian` and the R2 bucket `xinchejian-media`; wrangler adds the DNS record for each custom domain. The site is also reachable at `xinchejian.<account>.workers.dev`, which helps tell DNS problems from app problems.
-
-The admin is at `/_emdash/admin` and signs in with a passkey. A passkey is bound to the domain it was registered for, and EmDash keeps the session per host: a passkey created before the cutover (rpId `beta.xinchejian.com`) will not sign you in at the apex, and signing in at beta does not sign you in at the apex. A passkey created for the `xinchejian.com` rpId works at both. Losing the last passkey is recovered with a magic link when email is configured (below), and otherwise by resetting authentication in the database.
+The first deploy of each target creates its D1 database and R2 bucket, and wrangler adds the DNS record for each custom domain. Both are also reachable at `<worker>.<account>.workers.dev`, which helps tell DNS problems from app problems.
 
 `beta.xinchejian.com` sends `X-Robots-Tag: noindex`, so search engines don't index a duplicate of the live site.
+
+The admin is at `/_emdash/admin` and signs in with a passkey. A passkey is bound to the domain it was registered for, so one created at the apex will not sign you in on beta, and one created on beta will not sign you in at the apex. Losing the last passkey is recovered with a magic link when email is configured (below), and otherwise by resetting authentication in the database.
+
+### Releases
+
+`.github/workflows/deploy.yml` runs when a GitHub release is published: it builds and deploys beta, then waits for approval on the `production` environment before deploying the apex. Add required reviewers under **Settings → Environments → production**, or that second job runs unattended.
+
+A hostname can only be bound to one Worker, so the beta job fails on the first run: the production Worker still holds `beta.xinchejian.com`. Release it once by deploying production with the current config (`pnpm run deploy` locally), which drops the beta route from the production Worker.
+
+Two repository secrets are needed, both from the xinchejian Cloudflare account:
+
+- `CLOUDFLARE_API_TOKEN` — scoped as below
+- `CLOUDFLARE_ACCOUNT_ID` — the same value as the local `.env`
+
+| Scope                     | Permission |
+| ------------------------- | ---------- |
+| Account · Workers Scripts | Edit       |
+| Account · D1              | Edit       |
+| Account · Workers R2      | Edit       |
+| Account · Account Settings| Read       |
+| Zone · Workers Routes     | Edit       |
+| Zone · Zone               | Read       |
+
+Wrangler resolves the D1 database and R2 bucket by name, so the D1 and R2 scopes are needed even though both resources already exist. The Account scopes cannot be zone-restricted; set the Zone ones to `xinchejian.com`.
+
+Staging starts empty, so run the setup wizard at <https://beta.xinchejian.com/_emdash/admin> before expecting content there. Copying production content over is not a straight `wrangler d1 export`: EmDash's FTS5 tables make a plain export fail outright, and adding `--table` silently drops the `users` table.
 
 ### Email
 
@@ -74,7 +108,7 @@ The address mail actually reaches is the one on the admin's user record, so it h
 
 Done on 2026-10-04: `xinchejian.com` and `www.xinchejian.com` are bound to the Worker, and `www` 301s to the apex. It took two deploys because pointing `EMDASH_SITE_URL` at the apex also moves the passkey rpId, and a passkey is bound to the domain it was registered for — email went first so that magic-link recovery existed before the rpId changed.
 
-`beta.xinchejian.com` remains bound as staging and is kept out of the index; removing it is tracked in issue #21.
+`beta.xinchejian.com` is served by the separate `xinchejian-beta` Worker (see [Deploy](#deploy)) and is kept out of the index.
 
 ### The WordPress import is finished
 
