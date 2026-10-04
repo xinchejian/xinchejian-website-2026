@@ -43,23 +43,11 @@ jobs:
       - name: Check the build targeted beta
         run: |
           node -e "const c=JSON.parse(require('node:fs').readFileSync('dist/server/wrangler.json','utf8'));if(c.name!=='xinchejian-beta'){console.error('Refusing to deploy: build targeted '+c.name);process.exit(1)}console.log('Deploying '+c.name)"
-      # Migrate before deploying, not from the Worker's first request. Runtime
-      # migrations run inside a request under EmDash's own deadline; on a fresh
-      # database they exceed it, leave the lock held, and the site then serves
-      # pages without CMS data. The CLI has no such deadline.
-      - name: Inspect EmDash migrations
-        run: pnpm exec emdash migrate --status --json --d1 "${{ vars.BETA_D1_DATABASE_ID }}" --account-id "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Apply EmDash migrations
-        env:
-          EMDASH_TARGET_FINGERPRINT: ${{ vars.BETA_EMDASH_TARGET_FINGERPRINT }}
-        run: >-
-          pnpm exec emdash migrate
-          --d1 "${{ vars.BETA_D1_DATABASE_ID }}"
-          --account-id "$CLOUDFLARE_ACCOUNT_ID"
-          --expected-target-fingerprint "$EMDASH_TARGET_FINGERPRINT"
+      # No migrate step here on purpose. Staging shares production's database,
+      # so this deployment must not migrate it — beta's Worker runs with
+      # EMDASH_MIGRATIONS_MODE=check and serves 503 rather than applying
+      # migrations. The production job below is the only one that migrates.
       - run: pnpm exec wrangler deploy
-      - name: Check EmDash migrations
-        run: pnpm exec emdash migrate --check --d1 "${{ vars.BETA_D1_DATABASE_ID }}" --account-id "$CLOUDFLARE_ACCOUNT_ID"
 
   production:
     needs: beta
@@ -84,6 +72,11 @@ jobs:
       - name: Check the build targeted production
         run: |
           node -e "const c=JSON.parse(require('node:fs').readFileSync('dist/server/wrangler.json','utf8'));if(c.name!=='xinchejian'){console.error('Refusing to deploy: build targeted '+c.name);process.exit(1)}console.log('Deploying '+c.name)"
+      # Migrate before deploying, not from the Worker's first request. Runtime
+      # migrations run inside a request under EmDash's own deadline; on a fresh
+      # database they exceed it, leave the lock held, and the site then serves
+      # pages without CMS data. The CLI has no such deadline. This is also the
+      # only place the shared database is migrated.
       - name: Inspect EmDash migrations
         run: pnpm exec emdash migrate --status --json --d1 "${{ vars.D1_DATABASE_ID }}" --account-id "$CLOUDFLARE_ACCOUNT_ID"
       - name: Apply EmDash migrations

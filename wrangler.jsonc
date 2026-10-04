@@ -51,35 +51,41 @@
 	"env": {
 		"beta": {
 			"name": "xinchejian-beta",
+			// Shares production's database and bucket, deliberately. A separate
+			// copy went stale the moment either side was edited, and refreshing
+			// it cost a multi-hour site transfer, so staging showed content
+			// nobody was testing against. Sharing means beta always previews
+			// current content; what it gives up is testing a schema change or an
+			// EmDash upgrade in isolation.
 			"d1_databases": [
 				{
 					"binding": "DB",
-					"database_name": "xinchejian-beta",
-					// Pinned because the database's primary region is fixed when
-					// it is created, and D1 created by a CI deploy lands in the
-					// runner's region (US) rather than near the readers. This one
-					// was created with `--location apac` to match production;
-					// pinning the UUID also stops Wrangler re-resolving the name.
-					"database_id": "174543db-0192-4d82-8a9d-ca0f74a7e8b0",
+					"database_name": "xinchejian",
+					"database_id": "8478c7da-629e-4845-bf0d-6604f4e81fec",
 				},
 			],
 			"r2_buckets": [
 				{
 					"binding": "MEDIA",
-					"bucket_name": "xinchejian-media-beta",
+					"bucket_name": "xinchejian-media",
 				},
 			],
 			"routes": [{ "pattern": "beta.xinchejian.com", "custom_domain": true }],
-			// beta is its own origin now, so it is the site URL here. Production
-			// stopped accepting it once this environment took over the hostname.
 			"vars": {
 				"EMDASH_SITE_URL": "https://beta.xinchejian.com",
+				// Refuse to migrate the shared database from this deployment, and
+				// serve 503 while migrations are pending instead. Only the
+				// production job migrates; see the deploy workflow.
+				"EMDASH_MIGRATIONS_MODE": "check",
 			},
 			"send_email": [{ "name": "EMAIL" }],
 			"limits": { "cpu_ms": 30000 },
-			"triggers": {
-				"crons": ["* * * * *"],
-			},
+			// Explicitly empty, not omitted: `triggers` is inherited by named
+			// environments, so leaving it out would give staging production's
+			// cron. Production already runs the shared database's scheduled
+			// maintenance and a second Worker on the same minute schedule would
+			// run it twice.
+			"triggers": { "crons": [] },
 		},
 	},
 }
