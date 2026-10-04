@@ -66,16 +66,17 @@ Two repository secrets are needed, both from the xinchejian Cloudflare account:
 - `CLOUDFLARE_API_TOKEN` — scoped as below
 - `CLOUDFLARE_ACCOUNT_ID` — the same value as the local `.env`
 
-| Scope                     | Permission |
-| ------------------------- | ---------- |
-| Account · Workers Scripts | Edit       |
-| Account · D1              | Edit       |
-| Account · Workers R2      | Edit       |
-| Account · Account Settings| Read       |
-| Zone · Workers Routes     | Edit       |
-| Zone · Zone               | Read       |
+| Scope                      | Permission |
+| -------------------------- | ---------- |
+| Account · Workers Scripts  | Edit       |
+| Account · Workers KV       | Edit       |
+| Account · D1               | Edit       |
+| Account · Workers R2       | Edit       |
+| Account · Account Settings | Read       |
+| Zone · Workers Routes      | Edit       |
+| Zone · Zone                | Read       |
 
-Wrangler resolves the D1 database and R2 bucket by name, so the D1 and R2 scopes are needed even though both resources already exist. The Account scopes cannot be zone-restricted; set the Zone ones to `xinchejian.com`.
+Wrangler resolves each D1 database, R2 bucket and KV namespace by name and creates it when missing, so all three Edit scopes are needed even though production's already exist — the staging Worker provisions its own on its first deploy. The `SESSION` KV namespace is not declared in `wrangler.jsonc`; the Astro adapter adds it for sessions, and a token without KV access fails the first staging deploy with `Authentication error [code: 10000]` on `/accounts/.../storage/kv/namespaces`. The Account scopes cannot be zone-restricted; set the Zone ones to `xinchejian.com`. Adding `User · User Details · Read` and `User · Memberships · Read` silences wrangler's warnings but is not required.
 
 Staging starts empty, so run the setup wizard at <https://beta.xinchejian.com/_emdash/admin> before expecting content there. Copying production content over is not a straight `wrangler d1 export`: EmDash's FTS5 tables make a plain export fail outright, and adding `--table` silently drops the `users` table.
 
