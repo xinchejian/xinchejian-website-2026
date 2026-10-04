@@ -153,6 +153,14 @@ The site was migrated from the old WordPress install by `scripts/wp-import/`, wh
 
 **Do not run the import again, and never with `--refresh-content`.** The plan is a snapshot from the first import and has drifted — refreshing rewrites every entry that no longer matches it, reverting hand-made edits and blanking pages the plan holds as empty. To read the current content, pull it from D1. See [`scripts/wp-import/README.md`](scripts/wp-import/README.md) for which parts are still safe to run.
 
+## Accounts and site data
+
+Nothing in this repository grants an account. EmDash has no public sign-up, and an admin creates users by invite from the panel at `/_emdash/admin`.
+
+For an account, access to the staging site, or a copy of the site's content and media, email **nihaopaul@gmail.com**.
+
+Site content is not in this repository: entries live in D1 and media in R2, with [Deploy](#deploy) describing both environments. The WordPress import that seeded the content is a finished, historical migration and must not be re-run — see below.
+
 ## Branding
 
 The XinCheJian wrench mark in `public/` and `src/components/Logo*` is the
