@@ -55,6 +55,12 @@
 				{
 					"binding": "DB",
 					"database_name": "xinchejian-beta",
+					// Pinned because the database's primary region is fixed when
+					// it is created, and D1 created by a CI deploy lands in the
+					// runner's region (US) rather than near the readers. This one
+					// was created with `--location apac` to match production;
+					// pinning the UUID also stops Wrangler re-resolving the name.
+					"database_id": "174543db-0192-4d82-8a9d-ca0f74a7e8b0",
 				},
 			],
 			"r2_buckets": [

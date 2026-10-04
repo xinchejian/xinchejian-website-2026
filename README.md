@@ -80,6 +80,42 @@ Wrangler resolves each D1 database, R2 bucket and KV namespace by name and creat
 
 Staging starts empty, so run the setup wizard at <https://beta.xinchejian.com/_emdash/admin> before expecting content there. Copying production content over is not a straight `wrangler d1 export`: EmDash's FTS5 tables make a plain export fail outright, and adding `--table` silently drops the `users` table.
 
+### Migrations
+
+Core migrations run in the pipeline — build, `emdash migrate`, deploy, `emdash migrate --check` — not from the Worker's first request. Runtime mode (`migrations.runtime` default `"auto"`) applies pending migrations *inside* a request, under EmDash's own deadline. On a fresh database the set does not finish in time, the run is abandoned with the migration lock still held, and the site then serves pages without CMS data while every request waits for the lock first. The CLI has no deadline.
+
+Both jobs read their target from repository variables, because a non-interactive apply requires the exact fingerprint:
+
+| Variable                        | Value                                                        |
+| ------------------------------- | ------------------------------------------------------------ |
+| `D1_DATABASE_ID`                | production database UUID                                      |
+| `EMDASH_TARGET_FINGERPRINT`     | fingerprint from `emdash migrate --status` for production     |
+| `BETA_D1_DATABASE_ID`           | staging database UUID                                         |
+| `BETA_EMDASH_TARGET_FINGERPRINT`| the same for staging                                          |
+
+The fingerprint hashes the account and database identity, so it changes if a database is recreated. Update it only after checking the target that `--status` reports.
+
+Migrating by hand needs `CLOUDFLARE_API_TOKEN` with D1 Edit (it is in `.env`, which is gitignored):
+
+```sh
+pnpm emdash migrate --status --d1 <database>   # inspect; note the lock id if one is held
+pnpm emdash migrate --d1 <database>            # apply pending
+```
+
+A run that stops part-way leaves the lock held. Release it by id, then apply again:
+
+```sh
+pnpm wrangler d1 execute <database> --remote \
+  --command "UPDATE _emdash_migrations_lock SET is_locked = 0 WHERE is_locked = <id>"
+pnpm emdash migrate --d1 <database>
+```
+
+**A D1 database's primary region is fixed at creation, and one created by a CI deploy lands in the runner's region** — US, for GitHub-hosted runners. Staging's was, which put it in WNAM against an APAC readership: about 170 ms per query, pages roughly 8× slower, and a first migration set slow enough to blow the runtime deadline. Create new environments' databases explicitly and pin the UUID:
+
+```sh
+pnpm wrangler d1 create <name> --location apac
+```
+
 ### Email
 
 Outgoing mail (magic links, invites, comment notifications) goes through Cloudflare Email Sending, wired up by `cloudflareEmail()` in `astro.config.mjs` over the `EMAIL` binding in `wrangler.jsonc`. It sends as `it@xinchejian.com`.
