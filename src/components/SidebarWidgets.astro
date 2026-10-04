@@ -1,0 +1,151 @@
+---
+// The built-in WidgetArea renderer emits root-relative URLs and does not add the
+// locale prefix, so on Chinese pages its category, tag and recent-post links all
+// pointed at the English archives. Render the sidebar here instead: same markup
+// and classes, but every link localized — and terms with no posts in this locale
+// are dropped, so a link never lands on an empty archive.
+//
+// core:search and core:archives are deliberately not rendered: the header
+// already carries a live search, and the archives widget links to a route this
+// template does not have.
+import { getEmDashCollection, getMenu, getTaxonomyTerms, getWidgetArea } from "emdash";
+import { PortableText } from "emdash/ui";
+import { formatDate, getLocale, localizePath, postPath } from "../utils/i18n";
+
+interface Term {
+	slug: string;
+	label: string;
+	count?: number;
+	children?: Term[];
+}
+
+interface Props {
+	name: string;
+}
+
+const { name } = Astro.props;
+const locale = getLocale(Astro);
+const area = await getWidgetArea(name);
+
+const RECENT_COUNT = 5;
+const TAG_LIMIT = 30;
+
+const wantsRecent = (area?.widgets ?? []).some((w) => w.componentId === "core:recent-posts");
+const recent = wantsRecent
+	? await getEmDashCollection("posts", {
+			orderBy: { published_at: "desc" },
+			limit: RECENT_COUNT,
+			locale,
+		})
+	: null;
+type RecentEntry = NonNullable<typeof recent>["entries"][number];
+
+/** Hierarchical taxonomies arrive as a tree; the sidebar styles a flat list. */
+function flatten(terms: Term[]): Term[] {
+	return (terms ?? []).flatMap((term) => [term, ...flatten(term.children ?? [])]);
+}
+
+/**
+ * Drop terms with no visible posts in this locale. Guarded on counts being
+ * present at all — a caller that gets no counts should see the full list, not
+ * an empty one.
+ */
+function withPosts(terms: Term[]): Term[] {
+	const flat = flatten(terms);
+	if (!flat.some((term) => typeof term.count === "number")) return flat;
+	return flat.filter((term) => (term.count ?? 0) > 0);
+}
+
+const sections: (
+	| { kind: "terms"; title?: string; taxonomy: "category" | "tag"; terms: Term[]; showCounts: boolean }
+	| { kind: "recent"; title?: string; posts: RecentEntry[] }
+	| { kind: "content"; title?: string; content: unknown }
+	| { kind: "menu"; title?: string; items: { label: string; url: string }[] }
+)[] = [];
+
+for (const widget of area?.widgets ?? []) {
+	if (widget.componentId === "core:categories") {
+		sections.push({
+			kind: "terms",
+			title: widget.title,
+			taxonomy: "category",
+			terms: withPosts(await getTaxonomyTerms("category", { locale })),
+			showCounts: true,
+		});
+	} else if (widget.componentId === "core:tags") {
+		const terms = withPosts(await getTaxonomyTerms("tag", { locale }))
+			.sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+			.slice(0, TAG_LIMIT);
+		sections.push({ kind: "terms", title: widget.title, taxonomy: "tag", terms, showCounts: false });
+	} else if (widget.componentId === "core:recent-posts" && recent) {
+		sections.push({ kind: "recent", title: widget.title, posts: recent.entries });
+	} else if (widget.type === "content") {
+		sections.push({ kind: "content", title: widget.title, content: widget.content });
+	} else if (widget.type === "menu") {
+		const menu = widget.menuName ? await getMenu(widget.menuName, { locale }) : null;
+		sections.push({
+			kind: "menu",
+			title: widget.title,
+			items: (menu?.items ?? []).map((item) => ({
+				label: item.label,
+				url: item.url?.startsWith("/") ? localizePath(locale, item.url) : (item.url ?? "#"),
+			})),
+		});
+	}
+}
+---
+
+{
+	area && sections.length > 0 && (
+		<div class="widget-area" data-widget-area={area.name}>
+			{sections.map((section) => (
+				<section class="widget">
+					{section.title && <h2 class="widget__title">{section.title}</h2>}
+					<div class="widget__content">
+						{section.kind === "terms" && (
+							<ul class={section.showCounts ? "widget-categories" : "widget-tags__cloud"}>
+								{section.terms.map((term) => (
+									<li>
+										<a
+											href={localizePath(locale, `/${section.taxonomy}/${term.slug}`)}
+											class={section.showCounts ? "widget-categories__link" : "widget-tags__link"}
+										>
+											{term.label}
+										</a>
+										{section.showCounts && (
+											<span class="widget-categories__count">{term.count ?? 0}</span>
+										)}
+									</li>
+								))}
+							</ul>
+						)}
+						{section.kind === "recent" && (
+							<ul class="widget-recent-posts">
+								{section.posts.map((post) => (
+									<li>
+										<a href={postPath(locale, post)}>{post.data.title ?? "Untitled"}</a>
+										{post.data.publishedAt && (
+											<span class="widget-recent-posts__date">
+												{formatDate(post.data.publishedAt, locale, "short")}
+											</span>
+										)}
+									</li>
+								))}
+							</ul>
+						)}
+						{section.kind === "content" && <PortableText value={section.content} />}
+						{section.kind === "menu" && (
+							<ul class="widget-menu">
+								{section.items.map((item) => (
+									<li>
+										<a href={item.url}>{item.label}</a>
+									</li>
+								))}
+							</ul>
+						)}
+					</div>
+				</section>
+			))}
+		</div>
+	)
+}

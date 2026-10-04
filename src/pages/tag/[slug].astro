@@ -1,0 +1,155 @@
+---
+import {
+	getTaxonomyTermsWithCacheHint,
+	getEmDashCollection,
+	getTermsForEntries,
+	decodeSlug,
+} from "emdash";
+import Base from "../../layouts/Base.astro";
+import PostCard from "../../components/PostCard.astro";
+import { getReadingTime } from "../../utils/reading-time";
+import { getLocale, localizePath, postPath, t } from "../../utils/i18n";
+
+const locale = getLocale(Astro);
+const strings = t(locale);
+
+const slug = decodeSlug(Astro.params.slug);
+const termsResult = await getTaxonomyTermsWithCacheHint("tag", {
+	includeCounts: false,
+	locale,
+});
+const term = slug ? termsResult.data.find((item) => item.slug === slug) : null;
+
+if (!term) {
+	return Astro.redirect("/404");
+}
+
+const cursor = Astro.url.searchParams.get("cursor") || undefined;
+const {
+	entries: posts,
+	cacheHint,
+	nextCursor,
+} = await getEmDashCollection("posts", {
+	where: { tag: term.slug },
+	orderBy: { published_at: "desc" },
+	limit: 20,
+	cursor,
+	locale,
+});
+
+if (Astro.cache?.enabled) {
+	Astro.cache.set(termsResult.cacheHint);
+	Astro.cache.set(cacheHint);
+}
+
+// Single batched query for tags on every post tagged with this term,
+// rather than calling getEntryTerms() per post.
+const tagsByEntry = await getTermsForEntries(
+	"posts",
+	posts.map((p) => p.data.id),
+	"tag",
+	{ locale },
+);
+const filteredPosts = posts.map((post) => ({
+	post,
+	tags: tagsByEntry.get(post.data.id) ?? [],
+}));
+---
+
+<Base
+	title={strings.tagTitle(term.label)}
+	description={strings.tagDescription(term.label)}
+>
+	<section class="archive-section">
+		<header class="archive-header">
+			<span class="archive-label">{strings.tag}</span>
+			<h1 class="archive-title">{term.label}</h1>
+		</header>
+
+		{
+			filteredPosts.length === 0 ? (
+				<p class="no-posts">{strings.noPostsWithTag}</p>
+			) : (
+				<div class="posts-grid">
+					{filteredPosts.map(({ post, tags }) => (
+						<PostCard
+							title={post.data.title}
+							excerpt={post.data.excerpt}
+							featuredImage={post.data.featured_image}
+							href={postPath(locale, post)}
+							date={post.data.publishedAt ?? undefined}
+							readingTime={getReadingTime(post.data.content)}
+							tags={tags.map((t) => ({ slug: t.slug, label: t.label }))}
+							edit={post.edit}
+						/>
+					))}
+				</div>
+			)
+		}
+		<nav class="pagination" aria-label="Pagination">
+			{cursor && <a href={localizePath(locale, `/tag/${term.slug}`)}>{strings.firstPage}</a>}
+			{
+				nextCursor && (
+					<a
+						href={localizePath(locale, `/tag/${term.slug}?cursor=${encodeURIComponent(nextCursor)}`)}
+					>
+						{strings.nextPage}
+					</a>
+				)
+			}
+		</nav>
+	</section>
+</Base>
+
+<style>
+	.archive-section {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: var(--spacing-12) var(--spacing-6);
+	}
+
+	.archive-header {
+		margin-bottom: var(--spacing-12);
+		padding-bottom: var(--spacing-8);
+		border-bottom: 1px solid var(--color-border-subtle);
+	}
+
+	.archive-label {
+		display: block;
+		font-size: var(--font-size-xs);
+		font-weight: 500;
+		color: var(--color-brand);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wider);
+		margin-bottom: var(--spacing-2);
+	}
+
+	.archive-title {
+		font-size: var(--font-size-4xl);
+		font-weight: var(--font-weight-display);
+		letter-spacing: var(--tracking-tight);
+		margin-bottom: var(--spacing-2);
+	}
+
+	.posts-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: var(--spacing-12) var(--spacing-8);
+	}
+
+	.no-posts {
+		color: var(--color-muted);
+	}
+
+	@media (max-width: 900px) {
+		.posts-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 600px) {
+		.posts-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

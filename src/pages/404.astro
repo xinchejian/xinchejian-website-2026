@@ -1,0 +1,40 @@
+---
+import Base from "../layouts/Base.astro";
+import { getLocale, localizePath, stripLocale, t } from "../utils/i18n";
+
+// The 404 page is shared by every locale, so infer the language from the URL.
+const locale = getLocale({
+	currentLocale: Astro.url.pathname !== stripLocale(Astro.url.pathname) ? "zh" : Astro.currentLocale,
+});
+const strings = t(locale);
+---
+
+<Base title={strings.notFound}>
+	<div class="not-found">
+		<h1>404</h1>
+		<p>{strings.notFoundBody}</p>
+		<a href={localizePath(locale, "/")}>{strings.goHome}</a>
+	</div>
+</Base>
+
+<style>
+	.not-found {
+		text-align: center;
+		padding: var(--spacing-24) var(--spacing-6);
+	}
+
+	.not-found h1 {
+		font-size: var(--font-size-5xl);
+		margin-bottom: var(--spacing-2);
+		color: var(--color-border);
+	}
+
+	.not-found p {
+		color: var(--color-muted);
+		margin-bottom: var(--spacing-6);
+	}
+
+	.not-found a {
+		color: var(--color-text);
+	}
+</style>

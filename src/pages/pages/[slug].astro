@@ -1,0 +1,9 @@
+---
+// Pages used to live at /pages/<slug>; they now sit at the root like the
+// WordPress site (/<slug>).
+import { decodeSlug } from "emdash";
+import { getLocale, pagePath } from "../../utils/i18n";
+
+const slug = decodeSlug(Astro.params.slug);
+return Astro.redirect(slug ? pagePath(getLocale(Astro), slug) : "/404", 301);
+---

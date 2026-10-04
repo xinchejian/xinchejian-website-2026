@@ -1,0 +1,16 @@
+---
+// Posts used to live at /posts/<slug>; they now keep their WordPress
+// permalinks (/YYYY/MM/<slug>). Search results and old links land here.
+import { decodeSlug, getEmDashEntry } from "emdash";
+import { LOCALES, getLocale, postPath } from "../../utils/i18n";
+
+const locale = getLocale(Astro);
+const slug = decodeSlug(Astro.params.slug);
+if (slug) {
+	for (const l of [locale, ...LOCALES.filter((other) => other !== locale)]) {
+		const { entry } = await getEmDashEntry("posts", slug, { locale: l });
+		if (entry) return Astro.redirect(postPath(l, entry), 301);
+	}
+}
+return Astro.redirect("/404");
+---
