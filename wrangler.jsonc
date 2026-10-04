@@ -70,6 +70,17 @@
 					"bucket_name": "xinchejian-media",
 				},
 			],
+			// Pinned rather than left to the adapter's automatic `SESSION`
+			// binding. An unpinned binding is not resolved by name on deploy —
+			// Wrangler inherits it from the existing deployment, so replacing
+			// the namespace leaves the Worker permanently pointing at the old,
+			// deleted one and every deploy fails with code 10210.
+			"kv_namespaces": [
+				{
+					"binding": "SESSION",
+					"id": "530a7ce7ffcd4123a8316d37f0e5af11",
+				},
+			],
 			"routes": [{ "pattern": "beta.xinchejian.com", "custom_domain": true }],
 			"vars": {
 				"EMDASH_SITE_URL": "https://beta.xinchejian.com",
