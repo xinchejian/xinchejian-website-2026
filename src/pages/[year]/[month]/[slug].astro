@@ -21,7 +21,7 @@ const strings = t(locale);
 const slug = decodeSlug(Astro.params.slug);
 
 if (!slug) {
-	return Astro.redirect("/404");
+	return Astro.rewrite("/404");
 }
 
 const { entry: post, cacheHint } = await getEmDashEntry("posts", slug, { locale });
@@ -32,7 +32,14 @@ if (!post) {
 		const { entry } = await getEmDashEntry("posts", slug, { locale: other });
 		if (entry) return Astro.redirect(postPath(other, entry), 302);
 	}
-	return Astro.redirect("/404");
+	return Astro.rewrite("/404");
+}
+
+// A post with no publishedAt has no dated permalink — postPath() would fall
+// back to /posts/<slug>, and the redirect below would then bounce through the
+// legacy shim and back here. Serve the 404 instead.
+if (!post.data.publishedAt) {
+	return Astro.rewrite("/404");
 }
 
 // The year and month are part of the address, as on the old WordPress site.

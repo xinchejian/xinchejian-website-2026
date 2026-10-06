@@ -8,7 +8,13 @@
 // core:search and core:archives are deliberately not rendered: the header
 // already carries a live search, and the archives widget links to a route this
 // template does not have.
-import { getEmDashCollection, getMenu, getTaxonomyTerms, getWidgetArea } from "emdash";
+import {
+	getEmDashCollection,
+	getMenuWithCacheHint,
+	getTaxonomyTermsWithCacheHint,
+	getWidgetAreaWithCacheHint,
+	type CacheHint,
+} from "emdash";
 import { PortableText } from "emdash/ui";
 import { formatDate, getLocale, localizePath, postPath } from "../utils/i18n";
 
@@ -25,7 +31,15 @@ interface Props {
 
 const { name } = Astro.props;
 const locale = getLocale(Astro);
-const area = await getWidgetArea(name);
+
+// This component renders inside the article route, which caches its output, so
+// every read here has to contribute its cacheHint. Without them, editing a
+// widget, menu or taxonomy term would leave the cached article page stale.
+const cacheHints: CacheHint[] = [];
+
+const areaResult = await getWidgetAreaWithCacheHint(name);
+const area = areaResult.data;
+cacheHints.push(areaResult.cacheHint);
 
 const RECENT_COUNT = 5;
 const TAG_LIMIT = 30;
@@ -38,6 +52,7 @@ const recent = wantsRecent
 			locale,
 		})
 	: null;
+if (recent) cacheHints.push(recent.cacheHint);
 type RecentEntry = NonNullable<typeof recent>["entries"][number];
 
 /** Hierarchical taxonomies arrive as a tree; the sidebar styles a flat list. */
@@ -65,15 +80,19 @@ const sections: (
 
 for (const widget of area?.widgets ?? []) {
 	if (widget.componentId === "core:categories") {
+		const result = await getTaxonomyTermsWithCacheHint("category", { locale });
+		cacheHints.push(result.cacheHint);
 		sections.push({
 			kind: "terms",
 			title: widget.title,
 			taxonomy: "category",
-			terms: withPosts(await getTaxonomyTerms("category", { locale })),
+			terms: withPosts(result.data),
 			showCounts: true,
 		});
 	} else if (widget.componentId === "core:tags") {
-		const terms = withPosts(await getTaxonomyTerms("tag", { locale }))
+		const result = await getTaxonomyTermsWithCacheHint("tag", { locale });
+		cacheHints.push(result.cacheHint);
+		const terms = withPosts(result.data)
 			.sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
 			.slice(0, TAG_LIMIT);
 		sections.push({ kind: "terms", title: widget.title, taxonomy: "tag", terms, showCounts: false });
@@ -82,16 +101,23 @@ for (const widget of area?.widgets ?? []) {
 	} else if (widget.type === "content") {
 		sections.push({ kind: "content", title: widget.title, content: widget.content });
 	} else if (widget.type === "menu") {
-		const menu = widget.menuName ? await getMenu(widget.menuName, { locale }) : null;
+		const menuResult = widget.menuName
+			? await getMenuWithCacheHint(widget.menuName, { locale })
+			: null;
+		if (menuResult) cacheHints.push(menuResult.cacheHint);
 		sections.push({
 			kind: "menu",
 			title: widget.title,
-			items: (menu?.items ?? []).map((item) => ({
+			items: (menuResult?.data?.items ?? []).map((item) => ({
 				label: item.label,
 				url: item.url?.startsWith("/") ? localizePath(locale, item.url) : (item.url ?? "#"),
 			})),
 		});
 	}
+}
+
+if (Astro.cache?.enabled) {
+	for (const hint of cacheHints) Astro.cache.set(hint);
 }
 ---
 

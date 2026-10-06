@@ -21,7 +21,7 @@ const termsResult = await getTaxonomyTermsWithCacheHint("tag", {
 const term = slug ? termsResult.data.find((item) => item.slug === slug) : null;
 
 if (!term) {
-	return Astro.redirect("/404");
+	return Astro.rewrite("/404");
 }
 
 const cursor = Astro.url.searchParams.get("cursor") || undefined;
@@ -53,6 +53,7 @@ const tagsByEntry = await getTermsForEntries(
 const filteredPosts = posts.map((post) => ({
 	post,
 	tags: tagsByEntry.get(post.data.id) ?? [],
+	bylines: post.data.bylines ?? [],
 }));
 ---
 
@@ -71,7 +72,7 @@ const filteredPosts = posts.map((post) => ({
 				<p class="no-posts">{strings.noPostsWithTag}</p>
 			) : (
 				<div class="posts-grid">
-					{filteredPosts.map(({ post, tags }) => (
+					{filteredPosts.map(({ post, tags, bylines }) => (
 						<PostCard
 							title={post.data.title}
 							excerpt={post.data.excerpt}
@@ -80,6 +81,7 @@ const filteredPosts = posts.map((post) => ({
 							date={post.data.publishedAt ?? undefined}
 							readingTime={getReadingTime(post.data.content)}
 							tags={tags.map((t) => ({ slug: t.slug, label: t.label }))}
+							bylines={bylines}
 							edit={post.edit}
 						/>
 					))}
