@@ -17,6 +17,7 @@ import {
 } from "emdash";
 import { PortableText } from "emdash/ui";
 import { formatDate, getLocale, localizePath, postPath } from "../utils/i18n";
+import { assertContent } from "../utils/content";
 
 interface Term {
 	slug: string;
@@ -52,7 +53,10 @@ const recent = wantsRecent
 			locale,
 		})
 	: null;
-if (recent) cacheHints.push(recent.cacheHint);
+if (recent) {
+	assertContent(recent);
+	cacheHints.push(recent.cacheHint);
+}
 type RecentEntry = NonNullable<typeof recent>["entries"][number];
 
 /** Hierarchical taxonomies arrive as a tree; the sidebar styles a flat list. */

@@ -14,6 +14,7 @@ import SidebarWidgets from "../../../components/SidebarWidgets.astro";
 import { getReadingTime } from "../../../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../../../utils/site-identity";
 import { LOCALES, formatDate, getLocale, localizePath, postPath, t } from "../../../utils/i18n";
+import { assertContent } from "../../../utils/content";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -24,13 +25,16 @@ if (!slug) {
 	return Astro.rewrite("/404");
 }
 
-const { entry: post, cacheHint } = await getEmDashEntry("posts", slug, { locale });
+const postResult = await getEmDashEntry("posts", slug, { locale });
+assertContent(postResult);
+const { entry: post, cacheHint } = postResult;
 
 if (!post) {
 	// Many posts exist in only one language; send visitors to the one there is.
 	for (const other of LOCALES.filter((l) => l !== locale)) {
-		const { entry } = await getEmDashEntry("posts", slug, { locale: other });
-		if (entry) return Astro.redirect(postPath(other, entry), 302);
+		const otherResult = await getEmDashEntry("posts", slug, { locale: other });
+		assertContent(otherResult);
+		if (otherResult.entry) return Astro.redirect(postPath(other, otherResult.entry), 302);
 	}
 	return Astro.rewrite("/404");
 }
@@ -93,14 +97,13 @@ const readingTime = getReadingTime(post.data.content);
 const tags = post.data.terms?.tag ?? [];
 
 // Fetch a few extra recent posts in case the current post is among them.
-const { entries: recentPosts, cacheHint: recentPostsCacheHint } = await getEmDashCollection(
-	"posts",
-	{
+const recentResult = await getEmDashCollection("posts", {
 	orderBy: { published_at: "desc" },
 	limit: 4,
 	locale,
-	},
-);
+});
+assertContent(recentResult);
+const { entries: recentPosts, cacheHint: recentPostsCacheHint } = recentResult;
 if (Astro.cache?.enabled) Astro.cache.set(recentPostsCacheHint);
 const otherPosts = recentPosts.filter((p) => p.id !== post.id).slice(0, 3);
 

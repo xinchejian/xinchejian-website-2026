@@ -10,6 +10,7 @@ import PostCard from "../components/PostCard.astro";
 import { getReadingTime } from "../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 import { formatDate as formatLocaleDate, getLocale, localizePath, postPath, t } from "../utils/i18n";
+import { assertContent } from "../utils/content";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -22,7 +23,7 @@ const strings = t(locale);
 const GRID_POSTS = 12;
 const FETCH_WINDOW = 40;
 
-const [{ entries: posts, cacheHint }, settings] = await Promise.all([
+const [postsResult, settings] = await Promise.all([
 	getEmDashCollection("posts", {
 		orderBy: { published_at: "desc" },
 		limit: FETCH_WINDOW,
@@ -30,6 +31,8 @@ const [{ entries: posts, cacheHint }, settings] = await Promise.all([
 	}),
 	getSiteSettings(),
 ]);
+assertContent(postsResult);
+const { entries: posts, cacheHint } = postsResult;
 const { siteTitle, siteTagline } = resolveBlogSiteIdentity(settings);
 
 if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
