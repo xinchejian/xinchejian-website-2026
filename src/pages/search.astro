@@ -3,7 +3,7 @@ export const prerender = false;
 
 import { search } from "emdash";
 import Base from "../layouts/Base.astro";
-import { getLocale, localizePath, t } from "../utils/i18n";
+import { getLocale, localizePath, stripLocale, t } from "../utils/i18n";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -53,19 +53,25 @@ const { items: results } = query
 		{
 			results.length > 0 && (
 				<ol class="search-results">
-					{results.map((result) => (
-						<li class="search-result">
-							<a
-								href={localizePath(locale, `/posts/${result.slug ?? result.id}`)}
-								class="result-link"
-							>
-								<h2 class="result-title">{result.title ?? "Untitled"}</h2>
-								{result.snippet && (
-									<p class="result-snippet" set:html={result.snippet} />
-								)}
-							</a>
-						</li>
-					))}
+					{results.map((result) => {
+						// The search is locale-scoped, so `slug` is bare; `id` is the
+						// fallback and carries a "<locale>/" prefix outside the default
+						// locale, which localizePath would then add a second time.
+						const slug = result.slug ?? stripLocale(`/${result.id}`).slice(1);
+						return (
+							<li class="search-result">
+								<a
+									href={localizePath(locale, `/posts/${encodeURIComponent(slug)}`)}
+									class="result-link"
+								>
+									<h2 class="result-title">{result.title ?? "Untitled"}</h2>
+									{result.snippet && (
+										<p class="result-snippet" set:html={result.snippet} />
+									)}
+								</a>
+							</li>
+						);
+					})}
 				</ol>
 			)
 		}
