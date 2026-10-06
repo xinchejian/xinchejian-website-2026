@@ -1,6 +1,6 @@
 import cloudflare from "@astrojs/cloudflare";
 import react from "@astrojs/react";
-import { d1, r2 } from "@emdash-cms/cloudflare";
+import { d1, kvCache, r2 } from "@emdash-cms/cloudflare";
 import { cloudflareEmail } from "@emdash-cms/cloudflare/plugins";
 import { defineConfig, fontProviders } from "astro/config";
 import emdash from "emdash/astro";
@@ -42,6 +42,11 @@ function localizedRoutes(locales) {
 	};
 }
 
+// Staging previews production's content (they share the database), so its
+// cached reads have to turn over quickly; KV floors an expiry at 60s.
+// Production keeps the default hour.
+const isStaging = process.env.CLOUDFLARE_ENV === "beta";
+
 export default defineConfig({
 	output: "server",
 	adapter: cloudflare(),
@@ -62,6 +67,13 @@ export default defineConfig({
 		emdash({
 			database: d1({ binding: "DB", session: "auto" }),
 			storage: r2({ binding: "MEDIA" }),
+			// Content, settings, menu and taxonomy reads are cached in KV rather
+			// than hitting D1 on every render. The binding and both namespaces
+			// are declared in wrangler.jsonc.
+			objectCache: kvCache({
+				binding: "CACHE",
+				...(isStaging ? { defaultTtl: 60 } : {}),
+			}),
 			// Magic-link sign-in and account recovery. The domain must be
 			// onboarded for Cloudflare Email Sending, and the plugin activated
 			// under Extensions and selected under Settings -> Email.

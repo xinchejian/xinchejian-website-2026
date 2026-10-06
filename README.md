@@ -57,6 +57,8 @@ Wrangler adds the DNS record for each custom domain, and both Workers are reacha
 
 `beta.xinchejian.com` sends `X-Robots-Tag: noindex`, so search engines don't index a duplicate of the live site.
 
+EmDash's object cache is backed by Workers KV: content, settings, menu and taxonomy reads are stored in the `CACHE` namespace instead of hitting D1 on every render. Each environment has its own namespace (`xinchejian-cache`, `xinchejian-beta-cache`) because the cache keys carry no host, so sharing one would let the two Workers read each other's values. Staging also runs a 60-second `defaultTtl` (`astro.config.mjs`), since it previews production's content and should not serve a stale read for a full hour the way production does.
+
 The admin is at `/_emdash/admin` and signs in with a passkey. A passkey is bound to the domain it was registered for, so one created at the apex will not sign you in on beta, and one created on beta will not sign you in at the apex — but because the two share a users table, a beta-scoped passkey is a real account on production. That is one more reason to leave beta's admin alone. Losing the last passkey is recovered with a magic link when email is configured (below), and otherwise by resetting authentication in the database.
 
 ### Releases
@@ -78,7 +80,7 @@ Two repository secrets are needed, both from the xinchejian Cloudflare account:
 | Zone · Workers Routes      | Edit       |
 | Zone · Zone                | Read       |
 
-Wrangler resolves each D1 database, R2 bucket and KV namespace by name and creates it when missing, so all three Edit scopes are needed. The `SESSION` KV namespace is not declared in `wrangler.jsonc`; the Astro adapter adds it for sessions, and a token without KV access fails a deploy with `Authentication error [code: 10000]` on `/accounts/.../storage/kv/namespaces`. The Account scopes cannot be zone-restricted; set the Zone ones to `xinchejian.com`. Adding `User · User Details · Read` and `User · Memberships · Read` silences wrangler's warnings but is not required.
+Wrangler resolves each D1 database and R2 bucket by name and creates it when missing, so those Edit scopes are needed. KV namespaces are not created that way: a `kv_namespaces` entry must carry a real `id`, so the four namespaces (`xinchejian-session`, `xinchejian-cache` and their `-beta` counterparts) were created with `wrangler kv namespace create` and pinned in `wrangler.jsonc`. The `SESSION` namespace backs sessions and is what the Astro adapter expects; `CACHE` backs EmDash's object cache (see [Deploy](#deploy)). A token without KV access fails a deploy with `Authentication error [code: 10000]` on `/accounts/.../storage/kv/namespaces`. The Account scopes cannot be zone-restricted; set the Zone ones to `xinchejian.com`. Adding `User · User Details · Read` and `User · Memberships · Read` silences wrangler's warnings but is not required.
 
 ### Migrations
 

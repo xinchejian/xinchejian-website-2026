@@ -17,6 +17,17 @@
 			"bucket_name": "xinchejian-media",
 		},
 	],
+	// EmDash's object cache: content, settings, menu and taxonomy reads are
+	// stored here instead of hitting D1 on every render. Created with
+	// `wrangler kv namespace create xinchejian-cache`. Staging has its own
+	// namespace because cache keys carry no host — sharing one would let the two
+	// Workers read each other's values.
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			"id": "ea64081dfad2426ba2d1d937933ad1a3",
+		},
+	],
 	"routes": [
 		{ "pattern": "xinchejian.com", "custom_domain": true },
 		// Bound only so it can 301 to the apex; see src/host-redirect.ts.
@@ -43,11 +54,11 @@
 	"triggers": {
 		"crons": ["* * * * *"],
 	},
-	// Staging, on beta.xinchejian.com. Its own Worker, D1 database and R2 bucket,
-	// so a preview build and its first-request migrations cannot touch production
-	// content. Named environments inherit no bindings: everything the beta Worker
-	// needs is repeated here. Select it with CLOUDFLARE_ENV=beta at build and
-	// deploy time, not --env; see README.
+	// Staging, on beta.xinchejian.com. Its own Worker and route, running against
+	// production's database and bucket (see the d1_databases note below). Named
+	// environments inherit no bindings: everything the beta Worker needs is
+	// repeated here. Select it with CLOUDFLARE_ENV=beta at build and deploy
+	// time, not --env; see README.
 	"env": {
 		"beta": {
 			"name": "xinchejian-beta",
@@ -74,11 +85,16 @@
 			// binding. An unpinned binding is not resolved by name on deploy —
 			// Wrangler inherits it from the existing deployment, so replacing
 			// the namespace leaves the Worker permanently pointing at the old,
-			// deleted one and every deploy fails with code 10210.
+			// deleted one and every deploy fails with code 10210. CACHE is
+			// staging's own object-cache namespace; see the top-level note.
 			"kv_namespaces": [
 				{
 					"binding": "SESSION",
 					"id": "530a7ce7ffcd4123a8316d37f0e5af11",
+				},
+				{
+					"binding": "CACHE",
+					"id": "6c6ee7309ba94589a934c066c122503b",
 				},
 			],
 			"routes": [{ "pattern": "beta.xinchejian.com", "custom_domain": true }],
