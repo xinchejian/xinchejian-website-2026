@@ -3,6 +3,7 @@ import { getEmDashCollection, getTermsForEntries } from "emdash";
 import Base from "../../layouts/Base.astro";
 import { getReadingTime } from "../../utils/reading-time";
 import { formatDate as formatLocaleDate, getLocale, localizePath, postPath, t } from "../../utils/i18n";
+import { assertContent } from "../../utils/content";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -10,16 +11,14 @@ const strings = t(locale);
 // Sort in the database rather than in JS — lets the DB use its index on
 // published_at and avoids a full-table scan on the client.
 const cursor = Astro.url.searchParams.get("cursor") || undefined;
-const {
-	entries: posts,
-	cacheHint,
-	nextCursor,
-} = await getEmDashCollection("posts", {
+const postsResult = await getEmDashCollection("posts", {
 	orderBy: { published_at: "desc" },
 	limit: 20,
 	cursor,
 	locale,
 });
+assertContent(postsResult);
+const { entries: posts, cacheHint, nextCursor } = postsResult;
 
 if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
 

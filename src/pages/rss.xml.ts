@@ -3,17 +3,20 @@ import { getEmDashCollection, getSiteSettings } from "emdash";
 
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 import { getLocale, htmlLang, localizePath, postPath } from "../utils/i18n";
+import { assertContent } from "../utils/content";
 
 export const GET: APIRoute = async ({ site, url, currentLocale }) => {
 	const locale = getLocale({ currentLocale });
 	const siteUrl = site ?? new URL(url.origin);
 	const { siteTitle, siteTagline } = resolveBlogSiteIdentity(await getSiteSettings());
 
-	const { entries: posts } = await getEmDashCollection("posts", {
+	const postsResult = await getEmDashCollection("posts", {
 		orderBy: { published_at: "desc" },
 		limit: 20,
 		locale,
 	});
+	assertContent(postsResult);
+	const { entries: posts } = postsResult;
 
 	const items = posts
 		.map((post) => {

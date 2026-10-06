@@ -9,6 +9,7 @@ import { PortableText } from "emdash/ui";
 import Base from "../layouts/Base.astro";
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 import { LOCALES, getLocale, pagePath } from "../utils/i18n";
+import { assertContent } from "../utils/content";
 
 const locale = getLocale(Astro);
 
@@ -22,12 +23,15 @@ if (!slug) {
 const hasContent = (entry: { data?: { content?: readonly unknown[] } } | null | undefined): boolean =>
 	(entry?.data?.content?.length ?? 0) > 0;
 
-const { entry: page, cacheHint } = await getEmDashEntry("pages", slug, { locale });
+const pageResult = await getEmDashEntry("pages", slug, { locale });
+assertContent(pageResult);
+const { entry: page, cacheHint } = pageResult;
 
 if (!page) {
 	for (const other of LOCALES.filter((l) => l !== locale)) {
-		const { entry } = await getEmDashEntry("pages", slug, { locale: other });
-		if (entry) return Astro.redirect(pagePath(other, slug), 302);
+		const otherResult = await getEmDashEntry("pages", slug, { locale: other });
+		assertContent(otherResult);
+		if (otherResult.entry) return Astro.redirect(pagePath(other, slug), 302);
 	}
 	return Astro.rewrite("/404");
 }
@@ -39,8 +43,9 @@ if (!page) {
 // redirecting once it is.
 if (!hasContent(page)) {
 	for (const other of LOCALES.filter((l) => l !== locale)) {
-		const { entry } = await getEmDashEntry("pages", slug, { locale: other });
-		if (hasContent(entry)) return Astro.redirect(pagePath(other, slug), 302);
+		const otherResult = await getEmDashEntry("pages", slug, { locale: other });
+		assertContent(otherResult);
+		if (hasContent(otherResult.entry)) return Astro.redirect(pagePath(other, slug), 302);
 	}
 }
 

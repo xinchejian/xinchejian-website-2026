@@ -3,14 +3,16 @@
 // permalinks (/YYYY/MM/<slug>). Search results and old links land here.
 import { decodeSlug, getEmDashEntry } from "emdash";
 import { LOCALES, getLocale, postPath } from "../../utils/i18n";
+import { assertContent } from "../../utils/content";
 
 const locale = getLocale(Astro);
 const slug = decodeSlug(Astro.params.slug);
 if (slug) {
 	for (const l of [locale, ...LOCALES.filter((other) => other !== locale)]) {
-		const { entry } = await getEmDashEntry("posts", slug, { locale: l });
-		if (!entry) continue;
-		const target = postPath(l, entry);
+		const result = await getEmDashEntry("posts", slug, { locale: l });
+		assertContent(result);
+		if (!result.entry) continue;
+		const target = postPath(l, result.entry);
 		// A post with no publishedAt has no dated permalink: postPath() falls
 		// back to this same /posts/<slug> URL, so redirecting would loop.
 		if (target !== Astro.url.pathname) return Astro.redirect(target, 301);

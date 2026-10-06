@@ -9,6 +9,7 @@ import Base from "../../layouts/Base.astro";
 import PostCard from "../../components/PostCard.astro";
 import { getReadingTime } from "../../utils/reading-time";
 import { getLocale, localizePath, postPath, t } from "../../utils/i18n";
+import { assertContent } from "../../utils/content";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -25,17 +26,15 @@ if (!term) {
 }
 
 const cursor = Astro.url.searchParams.get("cursor") || undefined;
-const {
-	entries: posts,
-	cacheHint,
-	nextCursor,
-} = await getEmDashCollection("posts", {
+const postsResult = await getEmDashCollection("posts", {
 	where: { tag: term.slug },
 	orderBy: { published_at: "desc" },
 	limit: 20,
 	cursor,
 	locale,
 });
+assertContent(postsResult);
+const { entries: posts, cacheHint, nextCursor } = postsResult;
 
 if (Astro.cache?.enabled) {
 	Astro.cache.set(termsResult.cacheHint);
