@@ -61,7 +61,7 @@ The admin is at `/_emdash/admin` and signs in with a passkey. A passkey is bound
 
 ### Releases
 
-`.github/workflows/deploy.yml` runs when a GitHub release is published: it builds and deploys beta, then waits for approval on the `production` environment before deploying the apex. Add required reviewers under **Settings → Environments → production**, or that second job runs unattended. Only the production job migrates; see [Migrations](#migrations).
+`.github/workflows/deploy.yml` runs on every push to `main` and when a GitHub release is published. A push builds and deploys beta (`beta.xinchejian.com`), so merging refreshes staging automatically. A release does the same and then waits for approval on the `production` environment before deploying the apex; a manual run does both. Add required reviewers under **Settings → Environments → production**, or the production job runs unattended. Only the production job migrates; see [Migrations](#migrations).
 
 Two repository secrets are needed, both from the xinchejian Cloudflare account:
 

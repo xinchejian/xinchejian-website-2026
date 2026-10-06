@@ -1,8 +1,12 @@
 name: Deploy
 
-# Publishing a release deploys that tag. beta goes out automatically,
-# production waits for approval on the `production` GitHub environment.
+# beta deploys on every push to main and on a published release; production
+# deploys only on a release (or a manual run) and waits for approval on the
+# `production` GitHub environment. A merge therefore refreshes staging but
+# never ships to production on its own.
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
   # Manual runs use whatever ref is selected in the UI.
@@ -51,6 +55,11 @@ jobs:
 
   production:
     needs: beta
+    # A push to main refreshes staging only. Shipping needs a published
+    # release or an explicit manual run, which is where the approval gate
+    # belongs; queuing a production deploy on every merge would just leave
+    # runs parked waiting for a reviewer.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     # Required reviewers on this environment hold the deploy until beta has been
     # checked at https://beta.xinchejian.com. Configure them under
