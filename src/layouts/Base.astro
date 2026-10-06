@@ -250,6 +250,13 @@ const isLoggedIn = !!Astro.locals.user;
 							<line x1="18" y1="6" x2="6" y2="18"></line>
 						</svg>
 					</button>
+					{/* LiveSearch's default result URL is `/{collection}/{slug}` with no
+					    locale prefix, so on /zh pages every hit linked to the English
+					    path and landed the reader on the English article. routeMap
+					    supplies the locale-prefixed route. Posts keep their dated
+					    permalink, so /posts/<slug> is the legacy shim that redirects
+					    on; the token set has no year/month, so the shim is the only
+					    route expressible here. */}
 					<LiveSearch
 						placeholder={strings.searchPlaceholder}
 						class="site-search"
@@ -257,6 +264,10 @@ const isLoggedIn = !!Astro.locals.user;
 						resultsClass="site-search-results"
 						resultClass="site-search-result"
 						collections={["posts", "pages"]}
+						routeMap={{
+							posts: localizePath(locale, "/posts/:path"),
+							pages: localizePath(locale, "/pages/:path"),
+						}}
 					/>
 					<div class="nav-links">
 						{

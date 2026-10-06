@@ -9,8 +9,12 @@ const slug = decodeSlug(Astro.params.slug);
 if (slug) {
 	for (const l of [locale, ...LOCALES.filter((other) => other !== locale)]) {
 		const { entry } = await getEmDashEntry("posts", slug, { locale: l });
-		if (entry) return Astro.redirect(postPath(l, entry), 301);
+		if (!entry) continue;
+		const target = postPath(l, entry);
+		// A post with no publishedAt has no dated permalink: postPath() falls
+		// back to this same /posts/<slug> URL, so redirecting would loop.
+		if (target !== Astro.url.pathname) return Astro.redirect(target, 301);
 	}
 }
-return Astro.redirect("/404");
+return Astro.rewrite("/404");
 ---

@@ -15,7 +15,7 @@ const locale = getLocale(Astro);
 const slug = decodeSlug(Astro.params.slug);
 
 if (!slug) {
-	return Astro.redirect("/404");
+	return Astro.rewrite("/404");
 }
 
 /** A page carrying a title but no body is an import artifact, not a page. */
@@ -29,7 +29,7 @@ if (!page) {
 		const { entry } = await getEmDashEntry("pages", slug, { locale: other });
 		if (entry) return Astro.redirect(pagePath(other, slug), 302);
 	}
-	return Astro.redirect("/404");
+	return Astro.rewrite("/404");
 }
 
 // A page can exist in one locale with nothing in it — the WordPress import
