@@ -4,6 +4,7 @@ import Base from "../../layouts/Base.astro";
 import { getReadingTime } from "../../utils/reading-time";
 import { formatDate as formatLocaleDate, getLocale, localizePath, postPath, t } from "../../utils/i18n";
 import { assertContent } from "../../utils/content";
+import { setRouteCache } from "../../utils/cache";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -20,7 +21,7 @@ const postsResult = await getEmDashCollection("posts", {
 assertContent(postsResult);
 const { entries: posts, cacheHint, nextCursor } = postsResult;
 
-if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
+setRouteCache(Astro, cacheHint);
 
 // Single batched query for tags across all posts, instead of one
 // getEntryTerms() call per post (which would be N round-trips).

@@ -11,5 +11,8 @@ export const onRequest = defineMiddleware((context, next) => {
 	if (context.url.hostname !== "www.xinchejian.com") return next();
 
 	const { pathname, search } = context.url;
+	// Route caching would otherwise store this redirect under the page's TTL,
+	// and the Workers Cache does not separate entries by hostname.
+	context.cache?.set(false);
 	return context.redirect(`https://xinchejian.com${pathname}${search}`, 301);
 });

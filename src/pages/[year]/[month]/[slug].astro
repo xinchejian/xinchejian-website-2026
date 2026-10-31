@@ -15,6 +15,7 @@ import { getReadingTime } from "../../../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../../../utils/site-identity";
 import { LOCALES, formatDate, getLocale, localizePath, postPath, t } from "../../../utils/i18n";
 import { assertContent } from "../../../utils/content";
+import { setRouteCache } from "../../../utils/cache";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -52,7 +53,7 @@ if (!canonicalPath.endsWith(`/${Astro.params.year}/${Astro.params.month}/${encod
 	return Astro.redirect(canonicalPath, 301);
 }
 
-if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
+setRouteCache(Astro, cacheHint);
 
 // Get featured image URL for OG fallback
 // The image may have src (external) or meta.storageKey (local)
@@ -104,7 +105,7 @@ const recentResult = await getEmDashCollection("posts", {
 });
 assertContent(recentResult);
 const { entries: recentPosts, cacheHint: recentPostsCacheHint } = recentResult;
-if (Astro.cache?.enabled) Astro.cache.set(recentPostsCacheHint);
+setRouteCache(Astro, recentPostsCacheHint);
 const otherPosts = recentPosts.filter((p) => p.id !== post.id).slice(0, 3);
 
 // Single batched query for related-posts tags, rather than one
@@ -141,7 +142,7 @@ const publishDate = formatDate(post.data.publishedAt, locale);
 		{
 			post.data.featured_image && (
 				<div class="article-hero" {...post.edit.featured_image}>
-					<Image image={post.data.featured_image} />
+					<Image image={post.data.featured_image} priority />
 				</div>
 			)
 		}

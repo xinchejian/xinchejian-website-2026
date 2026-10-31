@@ -13,6 +13,9 @@ export const onRequest = defineMiddleware((context, next) => {
 	) {
 		url.searchParams.delete("lang");
 		const path = url.pathname === "/" ? "" : url.pathname;
+		// Opt out of route caching so the 301 is not stored under the target
+		// page's TTL; see the host redirect for the full reason.
+		context.cache?.set(false);
 		return context.redirect(`/zh${path}${url.search}`, 301);
 	}
 	return next();

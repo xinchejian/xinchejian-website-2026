@@ -8,6 +8,7 @@ import {
 } from "emdash/ui";
 import { createPublicPageContext } from "emdash/page";
 import LiveSearch from "emdash/ui/search";
+import { setRouteCache } from "../utils/cache";
 import LogoFull from "../components/LogoFull.astro";
 import LogoMark from "../components/LogoMark.astro";
 import { Font } from "astro:assets";
@@ -59,10 +60,8 @@ const [settingsResult, menuResult] = await Promise.all([
 	getSiteSettingsWithCacheHint(),
 	getMenuWithCacheHint("primary", { locale }),
 ]);
-if (Astro.cache?.enabled) {
-	Astro.cache.set(settingsResult.cacheHint);
-	Astro.cache.set(menuResult.cacheHint);
-}
+setRouteCache(Astro, settingsResult.cacheHint);
+setRouteCache(Astro, menuResult.cacheHint);
 
 // A logo uploaded in the admin (Settings → Site identity) replaces the
 // built-in XinCheJian wrench mark.

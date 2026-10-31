@@ -4,6 +4,14 @@ import { hreflangFor } from "./utils/i18n";
 export const onRequest = defineMiddleware(async (context, next) => {
 	let response = await next();
 
+	// Preview and edit URLs are per-token, so a stored copy would outlive the
+	// token. Components that render after the layout (WidgetArea, for one) set
+	// their own cache hint, so the opt-out has to come last in the request.
+	if (context.url.searchParams.has("_preview") || context.url.searchParams.has("_edit")) {
+		context.cache?.set(false);
+		response.headers.set("Cache-Control", "private, no-store");
+	}
+
 	// EmDashHead emits hreflang with the stored locale codes ("en", "zh");
 	// rewrite them to the region-qualified tags (en-US, zh-CN).
 	if (response.headers.get("content-type")?.includes("text/html")) {
