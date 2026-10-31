@@ -12,6 +12,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
 		response.headers.set("Cache-Control", "private, no-store");
 	}
 
+	// R2-backed media is served through the Worker with `max-age=0`, so every
+	// image view is a Worker invocation plus an R2 read. The Workers Cache reads
+	// this header, not `Cache-Control`: browsers still revalidate, while the
+	// edge keeps the bytes. Replacing an image keeps its URL, so purge the URL
+	// (or accept this TTL) when swapping one.
+	if (context.url.pathname.startsWith("/_emdash/api/media/file/") && response.status === 200) {
+		response.headers.set(
+			"Cloudflare-CDN-Cache-Control",
+			"public, max-age=86400, stale-while-revalidate=3600",
+		);
+	}
+
 	// EmDashHead emits hreflang with the stored locale codes ("en", "zh");
 	// rewrite them to the region-qualified tags (en-US, zh-CN).
 	if (response.headers.get("content-type")?.includes("text/html")) {
