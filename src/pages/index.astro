@@ -11,6 +11,7 @@ import { getReadingTime } from "../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 import { formatDate as formatLocaleDate, getLocale, localizePath, postPath, t } from "../utils/i18n";
 import { assertContent } from "../utils/content";
+import { setRouteCache } from "../utils/cache";
 
 const locale = getLocale(Astro);
 const strings = t(locale);
@@ -35,7 +36,7 @@ assertContent(postsResult);
 const { entries: posts, cacheHint } = postsResult;
 const { siteTitle, siteTagline } = resolveBlogSiteIdentity(settings);
 
-if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
+setRouteCache(Astro, cacheHint);
 
 // The rest of the archive is still reachable through /posts.
 const illustratedPosts = posts.filter((p) => p.data.featured_image);
@@ -95,7 +96,7 @@ function formatDate(date: Date | null | undefined) {
 						<div class="featured-grid">
 							<a href={postPath(locale, featuredPost)} class="featured-image-link">
 								<div class="featured-image" {...featuredPost.edit.featured_image}>
-									<Image image={featuredPost.data.featured_image} />
+									<Image image={featuredPost.data.featured_image} priority />
 								</div>
 							</a>
 							<div class="featured-content">

@@ -18,6 +18,7 @@ import {
 import { PortableText } from "emdash/ui";
 import { formatDate, getLocale, localizePath, postPath } from "../utils/i18n";
 import { assertContent } from "../utils/content";
+import { setRouteCache } from "../utils/cache";
 
 interface Term {
 	slug: string;
@@ -120,9 +121,7 @@ for (const widget of area?.widgets ?? []) {
 	}
 }
 
-if (Astro.cache?.enabled) {
-	for (const hint of cacheHints) Astro.cache.set(hint);
-}
+for (const hint of cacheHints) setRouteCache(Astro, hint);
 ---
 
 {
