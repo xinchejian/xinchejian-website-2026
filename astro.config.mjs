@@ -96,6 +96,14 @@ export default defineConfig({
 	image: {
 		layout: "constrained",
 		responsiveStyles: true,
+		// Images are stored in R2 and served from the site's own
+		// /_emdash/api/media/file route. Astro only generates responsive
+		// variants for a remote URL whose origin is allowlisted; without this
+		// every srcset candidate pointed at the same full-size original.
+		remotePatterns: [
+			{ protocol: "https", hostname: "xinchejian.com" },
+			{ protocol: "https", hostname: "**.xinchejian.com" },
+		],
 	},
 	integrations: [
 		react(),
